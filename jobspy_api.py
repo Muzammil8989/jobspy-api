@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -119,6 +120,43 @@ def _validate_payload(data: dict[str, Any]) -> dict[str, Any]:
         "is_remote": is_remote,
         "country_indeed": country_indeed,
     }
+
+
+def _scrape_all_sites(
+    site_names: list[str], common_params: dict[str, Any]
+) -> tuple[pd.DataFrame, list[str]]:
+    """Run scrape_jobs() once per site in parallel.
+
+    jobspy's own scrape_jobs() scrapes every requested site concurrently but
+    re-raises the first exception it hits, so one blocked/rate-limited site
+    (LinkedIn and Naukri are the frequent offenders) wipes out every other
+    site's results too. Isolating each site here means a single failure only
+    drops that site instead of the whole request.
+    """
+    frames: list[pd.DataFrame] = []
+    failed_sites: list[str] = []
+
+    with ThreadPoolExecutor(max_workers=len(site_names)) as executor:
+        future_to_site = {
+            executor.submit(scrape_jobs, site_name=site, **common_params): site
+            for site in site_names
+        }
+        for future in as_completed(future_to_site):
+            site = future_to_site[future]
+            try:
+                df = future.result()
+            except Exception:
+                logger.exception("Site '%s' failed, skipping", site)
+                failed_sites.append(site)
+                continue
+            if df is not None and not df.empty:
+                frames.append(df)
+
+    if not frames and failed_sites:
+        raise RuntimeError(f"All requested sites failed: {failed_sites}")
+
+    combined = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    return combined, failed_sites
 
 
 def _normalize_date_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -215,19 +253,21 @@ def scrape() -> Any:
         logger.info("Rejected request: %s", exc)
         return jsonify({"success": False, "error": str(exc), "jobs": []}), 400
 
+    site_names = params.pop("site_name")
+
     logger.info(
         "Scraping '%s' in '%s' (sites=%s, remote=%s, results_wanted=%s)",
         params["search_term"],
         params["location"] or "any",
-        params["site_name"],
+        site_names,
         params["is_remote"],
         params["results_wanted"],
     )
 
     try:
-        jobs_df = scrape_jobs(**params)
+        jobs_df, failed_sites = _scrape_all_sites(site_names, params)
     except Exception:
-        logger.exception("scrape_jobs() failed")
+        logger.exception("scrape_jobs() failed for every requested site")
         return (
             jsonify(
                 {
@@ -254,8 +294,18 @@ def scrape() -> Any:
             500,
         )
 
+    if failed_sites:
+        logger.warning("Sites that failed and were skipped: %s", failed_sites)
+
     logger.info("Found %d job(s) for '%s'", len(records), params["search_term"])
-    return jsonify({"success": True, "count": len(records), "jobs": records})
+    return jsonify(
+        {
+            "success": True,
+            "count": len(records),
+            "jobs": records,
+            "failed_sites": failed_sites,
+        }
+    )
 
 
 @app.errorhandler(404)

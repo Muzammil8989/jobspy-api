@@ -131,11 +131,14 @@ Successful response:
       "job_url": "https://example.com/job/123",
       "date_posted": "2026-09-19"
     }
-  ]
+  ],
+  "failed_sites": []
 }
 ```
 
 Job fields can vary by source. The API returns the columns supplied by JobSpy rather than enforcing a fixed job schema.
+
+Each requested site is scraped independently, so one blocked or unsupported site (e.g. Glassdoor rejecting a country, or a site rate-limiting the request) does not fail the whole search. `failed_sites` lists which of the requested `site_names` produced no results because their scraper raised an error; the request still returns `success: true` with results from the sites that did work, as long as at least one site succeeded.
 
 ## Errors
 
