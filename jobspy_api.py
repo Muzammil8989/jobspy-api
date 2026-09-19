@@ -111,6 +111,10 @@ def _validate_payload(data: dict[str, Any]) -> dict[str, Any]:
 
     country_indeed = str(data.get("country_indeed", DEFAULT_COUNTRY_INDEED)).strip()
 
+    linkedin_fetch_description = data.get("linkedin_fetch_description", False)
+    if not isinstance(linkedin_fetch_description, bool):
+        raise ValidationError("'linkedin_fetch_description' must be a boolean.")
+
     return {
         "search_term": search_term,
         "location": location,
@@ -119,6 +123,7 @@ def _validate_payload(data: dict[str, Any]) -> dict[str, Any]:
         "hours_old": hours_old,
         "is_remote": is_remote,
         "country_indeed": country_indeed,
+        "linkedin_fetch_description": linkedin_fetch_description,
     }
 
 

@@ -98,6 +98,7 @@ Runs a job search. Send a JSON request body with the following fields:
 | `hours_old` | integer | No | `96` | Maximum age of job listings in hours |
 | `is_remote` | boolean | No | `null` | Set to `true` or `false` to apply a remote filter |
 | `country_indeed` | string | No | `"USA"` | Country used for Indeed searches |
+| `linkedin_fetch_description` | boolean | No | `false` | Fetch each LinkedIn job's full description (slower per-job, but needed for keyword/skill matching downstream) |
 
 Example request:
 
