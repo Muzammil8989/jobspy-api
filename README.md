@@ -104,6 +104,7 @@ Example request:
 ```bash
 curl --request POST http://localhost:5000/scrape \
   --header "Content-Type: application/json" \
+  --header "X-API-Key: replace-with-your-api-key" \
   --data '{
     "search_term": "Python Developer",
     "location": "Karachi, Pakistan",
@@ -165,11 +166,12 @@ The service recognizes these environment variables:
 | `PORT` | `5000` | Development server port |
 | `FLASK_DEBUG` | `0` | Set to `1` to enable Flask debug mode locally |
 | `LOG_LEVEL` | `INFO` | Python logging level, such as `DEBUG` or `WARNING` |
+| `API_KEY` | — | Required secret sent by clients in the `X-API-Key` header |
 
 For a direct production-style launch:
 
 ```bash
-gunicorn --bind 0.0.0.0:5000 --timeout 120 --workers 2 jobspy_api:app
+gunicorn --bind 0.0.0.0:5000 --timeout 180 --workers 1 jobspy_api:app
 ```
 
 ## Using the API from n8n
@@ -180,6 +182,7 @@ Add an **HTTP Request** node with:
 - URL from another Docker container: `http://host.docker.internal:5000/scrape`
 - URL when n8n shares this Compose network: `http://jobspy-api:5000/scrape`
 - Body content type: JSON
+- Header: `X-API-Key` with the same secret configured in the service's `API_KEY` environment variable
 - Body: any valid `/scrape` request shown above
 
 On Linux, `host.docker.internal` may require the Docker host-gateway mapping. Sharing a Docker network and using the service name is usually simpler.

@@ -16,7 +16,7 @@ Run (development)
 
 Run (production, via Docker/gunicorn)
 --------------------------------------
-    gunicorn --bind 0.0.0.0:5000 --timeout 120 --workers 2 jobspy_api:app
+    gunicorn --bind 0.0.0.0:5000 --timeout 180 --workers 1 jobspy_api:app
 
 Endpoints
 ---------
@@ -48,6 +48,7 @@ DEFAULT_COUNTRY_INDEED = "USA"
 MAX_RESULTS_WANTED = 200  # hard ceiling to avoid runaway scrape jobs
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+API_KEY = os.environ.get("API_KEY", "").strip()
 
 logging.basicConfig(
     level=LOG_LEVEL,
@@ -178,6 +179,29 @@ def scrape() -> Any:
           "country_indeed": "Pakistan"               // optional
         }
     """
+    if not API_KEY:
+        logger.error("API_KEY environment variable is not configured")
+        return (
+            jsonify({
+                "success": False,
+                "error": "Server authentication is not configured.",
+                "jobs": [],
+            }),
+            500,
+        )
+
+    supplied_key = request.headers.get("X-API-Key", "").strip()
+
+    if supplied_key != API_KEY:
+        return (
+            jsonify({
+                "success": False,
+                "error": "Invalid API key.",
+                "jobs": [],
+            }),
+            401,
+        )
+
     raw_body = request.get_json(silent=True)
     if raw_body is None:
         return (
